@@ -14,9 +14,9 @@ Students:
 - TODO items show you where to improve and extend the scoring.
 - Do not change the function signatures — the Recommend Agent depends on them.
 """
+import re 
 
-
-def score_product(product: dict, max_budget: float = None) -> float:
+def score_product(product: dict, max_budget: float = None,query:str="") -> float:
     """
     Scores a single product on a 0–100 scale.
 
@@ -46,12 +46,69 @@ def score_product(product: dict, max_budget: float = None) -> float:
 
     # Popularity score — cap review count at 10,000 for normalisation
     popularity_score = min(review_count / 10000, 1) * 100
+    query_lower=query.lower()
+
+    if any(word in query_lower for word in ["budget","cheap","affordable","low price"]):
+        w_price,w_rating,w_popularity=0.60,0.25,0.15
+    elif any(word in query_lower for word in ["best","top_rated","highly rated"]):
+        w_price,w_rating,w_popularity=0.20,0.60,0.20
+    elif any(word in query_lower for word in ["popular","trending","bestseller"]):
+        w_price,w_rating,w_popularity=0.20,0.30,0.50
+    else:
+        w_price,w_rating,w_popularity=0.40,0.40,0.20
+
+    spec_bonus=spec_score(product)
+
+    value_score=0
+    specs=product.get("key_specs","").lower()
+    price=float(product.get("price",1))
+
+    unit_match=re.search(r"(\d+)\s*(ml|g|gb|tb)",specs)
+    if unit_match:
+        quantity=int(unit_match.group(1))
+        price_per_unit=price/quantity
+        value_score=min(100/price_per_unit,100) if price_per_unit>0 else 0
 
     # Weighted total
-    total = (price_score * 0.40) + (rating_score * 0.40) + (popularity_score * 0.20)
+    total = (price_score * w_price) + (rating_score * w_rating) + (popularity_score * w_popularity) + spec_bonus + (value_score*0.20)
 
     return round(total, 2)
 
+def spec_score(product: dict) -> float:
+    """
+    Returns a bonus score (0–20) based on category-specific specs
+    parsed from the key_specs field.
+    """    
+    category = product.get("category", "").lower()
+    specs    = product.get("key_specs", "").lower()
+    score    = 0
+
+    if category == "electronics":
+        # Battery: higher mAh = better
+        battery = re.search(r"(\d+)\s*mah", specs)
+        if battery:
+            score += min(int(battery.group(1)) / 5000, 1) * 10  # cap at 5000mAh
+
+        # RAM: higher GB = better
+        ram = re.search(r"(\d+)\s*gb\s*ram", specs)
+        if ram:
+            score += min(int(ram.group(1)) / 12, 1) * 10  # cap at 12GB
+
+    elif category == "skincare":
+        # Volume: more ml/g per rupee = better value
+        volume = re.search(r"(\d+)\s*(ml|g)\b", specs)
+        price  = float(product.get("price", 1))
+        if volume:
+            units_per_rupee = int(volume.group(1)) / price
+            score += min(units_per_rupee * 100, 20)  # cap at 20 bonus points
+
+    elif category == "fashion":
+        # Material quality keywords
+        premium_materials = ["cotton", "silk", "wool", "linen", "leather"]
+        if any(mat in specs for mat in premium_materials):
+            score += 10
+
+    return round(score, 2)
 
 def compare_and_rank(products: list[dict], max_budget: float = None, top_n: int = 3) -> list[dict]:
     """
@@ -74,7 +131,7 @@ def compare_and_rank(products: list[dict], max_budget: float = None, top_n: int 
     # Score each product
     for product in products:
         product["score"] = score_product(product, max_budget)
-
+    
     # Sort by score descending
     sorted_products = sorted(products, key=lambda x: x["score"], reverse=True)
 
