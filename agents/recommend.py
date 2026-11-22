@@ -13,9 +13,12 @@ Students:
 - You need to complete the LLM call for your chosen provider (see TODOs).
 - Only implement the provider your team is using — leave others as stubs.
 """
-
+import os
+from dotenv import load_dotenv
 import config
+import google.generativeai as genai 
 
+load_dotenv()
 
 def build_prompt(user_query: str, top_products: list[dict]) -> str:
     """
@@ -92,20 +95,31 @@ def get_recommendation(user_query: str, top_products: list[dict]) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _call_gemini(prompt: str) -> str:
-    """
-    Calls the Google Gemini API and returns the response text.
+    try:
+        """
+            Calls the Google Gemini API and returns the response text.
 
-    TODO:
-        1. Install the SDK:       pip install google-generativeai
-        2. Import and configure:
+            TODO:
+             1. Install the SDK:       pip install google-generativeai
+            2. Import and configure:
                import google.generativeai as genai
                genai.configure(api_key=config.GEMINI_API_KEY)
-        3. Create a model and call it:
+             3. Create a model and call it:
                model = genai.GenerativeModel("gemini-1.5-flash")
                response = model.generate_content(prompt)
                return response.text
-    """
-    raise NotImplementedError("Gemini integration not yet implemented. See TODO in _call_gemini()")
+             """
+        my_api_key=os.getenv("GEMINI_API_KEY")
+        print(my_api_key)
+        genai.configure(api_key=my_api_key)
+        model=genai.GenerativeModel("gemini-3.8-flash")
+        response=model.generate_content(prompt)        
+        return response.text
+    except Exception as ex:
+        print(f"[call_gemini]Error while calling API:{ex}")
+        return f"Exception while generating exception {ex}"
+
+    #raise NotImplementedError("Gemini integration not yet implemented. See TODO in _call_gemini()")
 
 
 def _call_openai(prompt: str) -> str:

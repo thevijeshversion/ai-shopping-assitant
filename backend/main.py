@@ -67,7 +67,10 @@ class ChatResponse(BaseModel):
 @app.get("/health")
 def health_check():
     """Simple health check endpoint."""
-    return {"status": "ok"}
+    try:
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Health check failed: {e}")
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -88,11 +91,14 @@ def chat(request: ChatRequest):
     """
 
     # Step 1 — Search
-    search_results = search_products(
-        query=request.message,
-        max_budget=request.max_budget,
-        category=request.category,
-    )
+    try:
+        search_results = search_products(
+            query=request.message,
+            max_budget=request.max_budget,
+            category=request.category,
+        )        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search agent failed: {e}")
 
     if not search_results:
         raise HTTPException(
@@ -101,10 +107,18 @@ def chat(request: ChatRequest):
         )
 
     # Step 2 — Compare
-    top_products = compare_and_rank(search_results, max_budget=request.max_budget)
+    try:
+        top_products = compare_and_rank(search_results, max_budget=request.max_budget)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Compare agent failed: {e}")
 
     # Step 3 — Recommend
-    recommendation = get_recommendation(request.message, top_products)
+    try:
+        recommendation = get_recommendation(request.message, top_products)
+        print(recommendation)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommend agent failed: {e}")
 
     return ChatResponse(
         user_message=request.message,
